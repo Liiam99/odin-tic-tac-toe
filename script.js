@@ -2,18 +2,12 @@ const gameboard = (function () {
     const gridDim = 3;
     const grid = Array(gridDim*gridDim).fill(undefined);
 
-    function placeMark (position, mark) {
+    function placeMark(position, mark) {
         if (grid[position] || position >= grid.length) {
             return false;
         }
 
         grid[position] = mark;
-
-        for (let i = 0; i < grid.length; i += gridDim) {
-            console.log(grid.slice(i, i + gridDim));
-        }
-
-        console.log('-----------------');
 
         return true;
     }
@@ -96,7 +90,11 @@ const gameboard = (function () {
         return false;
     }
 
-    return { placeMark, checkWin };
+    function getBoard() {
+        return grid;
+    }
+
+    return {checkWin, getBoard, placeMark};
 })();
 
 const gameController = (function () {
@@ -105,33 +103,58 @@ const gameController = (function () {
 
     const board = gameboard;
     let currentPlayer = playerX;
-    let gameWon = board.checkWin();
 
-    while (gameWon === false) {
-        currentPlayer = currentPlayer === playerX ? playerO : playerX;
-        let validMove;
+    function makeMove(pos) {
+        validMove = board.placeMark(pos, currentPlayer.mark);
+        const gameWon = board.checkWin();
 
-        do {
-            const pos = prompt('Where would you like to place your mark?');
+        if (gameWon) {
+            console.log(`Game over. Winner: ${currentPlayer.name}.`);
+        } else if (gameWon !== false) {
+            console.log('Tie.');
+        }
 
-            validMove = board.placeMark(pos, currentPlayer.mark);
+        if (validMove) {
+            currentPlayer = currentPlayer === playerX ? playerO : playerX;
+        }
 
-            if (!validMove) {
-                console.log('Invalid move. Try again.');
-            }
-        } while (!validMove);
-
-        gameWon = board.checkWin();
+        return validMove;
     }
 
-    if (gameWon) {
-        console.log(`Game over. Winner: ${currentPlayer.name}.`)
-    } else {
-        console.log('Tie.')
-    }
+    return { getBoard: board.getBoard, makeMove };
 })();
 
 
 function createPlayer (name, mark) {
     return { name, mark };
 }
+
+const displayController = (function() {
+    const boardElement = document.querySelector('.board');
+    const game = gameController;
+
+    function updateDisplay () {
+        const docFrag = document.createDocumentFragment();
+
+        for (const [idx, mark] of game.getBoard().entries()) {
+            const cellElement = document.createElement('button');
+            cellElement.textContent = mark;
+            cellElement.dataset.indexNumber = idx;
+            docFrag.appendChild(cellElement);
+        }
+
+        boardElement.innerHTML = '';
+        boardElement.appendChild(docFrag);
+    }
+
+    boardElement.addEventListener('click', (e) => {
+        const button = e.target;
+        const indexNumber = button.dataset.indexNumber;
+
+        if (game.makeMove(indexNumber)) {
+            updateDisplay();
+        }
+    });
+
+    updateDisplay();
+})();
