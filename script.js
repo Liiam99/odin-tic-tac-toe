@@ -94,35 +94,47 @@ const gameboard = (function () {
         return grid;
     }
 
-    return {checkWin, getBoard, placeMark};
+    function clearGame() {
+        grid.forEach((_, index) => grid[index] = undefined);
+    }
+
+    return { checkWin, clearGame, getBoard, placeMark };
 })();
 
-const gameController = (function () {
-    const playerX = createPlayer('Henk', 'X');
-    const playerO = createPlayer('Mand', 'O');
+
+function GameController(nameX, nameO) {
+    const playerX = createPlayer(nameX, 'X');
+    const playerO = createPlayer(nameO, 'O');
 
     const board = gameboard;
     let currentPlayer = playerX;
+    let hasEnded = false;
+
+    function getCurrentPlayer() {
+        return currentPlayer;
+    }
+
+    function hasGameEnded() {
+        return hasEnded;
+    }
 
     function makeMove(pos) {
         validMove = board.placeMark(pos, currentPlayer.mark);
-        const gameWon = board.checkWin();
-
-        if (gameWon) {
-            console.log(`Game over. Winner: ${currentPlayer.name}.`);
-        } else if (gameWon !== false) {
-            console.log('Tie.');
-        }
 
         if (validMove) {
-            currentPlayer = currentPlayer === playerX ? playerO : playerX;
+            hasEnded = board.checkWin();
+
+            if (hasEnded === false) {
+                currentPlayer = currentPlayer === playerX ? playerO : playerX;
+            }
         }
 
         return validMove;
     }
 
-    return { getBoard: board.getBoard, makeMove };
-})();
+    return { clearGame: board.clearGame, getBoard: board.getBoard,
+        getCurrentPlayer, hasGameEnded, makeMove};
+}
 
 
 function createPlayer (name, mark) {
@@ -131,9 +143,12 @@ function createPlayer (name, mark) {
 
 const displayController = (function() {
     const boardElement = document.querySelector('.board');
-    const game = gameController;
+    const restartButton = document.querySelector('.restart');
+    const startButton = document.querySelector('.start');
 
-    function updateDisplay () {
+    let game;
+
+    function updateDisplay(game) {
         const docFrag = document.createDocumentFragment();
 
         for (const [idx, mark] of game.getBoard().entries()) {
@@ -147,14 +162,85 @@ const displayController = (function() {
         boardElement.appendChild(docFrag);
     }
 
+    startButton.addEventListener('click', () => {
+        startButton.disabled = true;
+        restartButton.disabled = false;
+
+        const playerXInput = document.querySelector('#player-X');
+        const nameX = playerXInput.value;
+        playerXInput.disabled = true;
+
+        const playerOInput = document.querySelector('#player-O');
+        const nameO = playerOInput.value;
+        playerOInput.disabled = true;
+
+        game = GameController(nameX, nameO);
+        updateDisplay(game);
+
+        const startingPlayer = game.getCurrentPlayer();
+        displayCurrentPlayer(startingPlayer);
+    });
+
+    restartButton.addEventListener('click', () => {
+        document.querySelector('#player-X').disabled = false;
+        document.querySelector('#player-O').disabled = false;
+        startButton.disabled = false;
+        restartButton.disabled = true;
+
+        game.clearGame();
+        boardElement.innerHTML = '';
+
+        const currentPlayer = document.querySelector('.current-player');
+        if (currentPlayer) {
+            currentPlayer.className = '';
+        }
+    });
+
     boardElement.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'BUTTON') {
+            return;
+        }
+
         const button = e.target;
         const indexNumber = button.dataset.indexNumber;
 
         if (game.makeMove(indexNumber)) {
-            updateDisplay();
+            updateDisplay(game);
+
+            const hasGameEnded = game.hasGameEnded();
+
+            if (hasGameEnded !== false) {
+                // True represents a win, null a tie.
+                if (hasGameEnded) {
+                    displayResult('win');
+                } else {
+                    displayResult('tie');
+                }
+            } else {
+                displayCurrentPlayer(game.getCurrentPlayer());
+            }
         }
     });
 
-    updateDisplay();
+    function displayCurrentPlayer(player) {
+        const previousPlayer = document.querySelector('.current-player');
+
+        if (previousPlayer) {
+            previousPlayer.className = '';
+        }
+
+        const currentPlayer = document.querySelector(`label[for="player-${player.mark}"]`);
+        currentPlayer.className = 'current-player';
+    }
+
+    function displayResult(result) {
+        const buttons = boardElement.querySelectorAll('button');
+        buttons.forEach(button => button.disabled = true);
+
+        if (result === 'tie') {
+            document.querySelector('.current-player').className = '';
+        } else {
+            document.querySelector('.current-player').className += ' winner';
+        }
+    }
 })();
